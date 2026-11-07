@@ -240,6 +240,14 @@ def test_add_camera_and_credential_masking(cam_setup):
     assert reader is not None
     assert reader._running is False  # Configuring a camera while DISARMED must not start monitoring.
     assert engine.camera_manager.count_total() == 1
+    default_zones = engine.zone_manager.get_zones("cam_entrance_01")
+    assert len(default_zones) == 1
+    assert default_zones[0].polygon == [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (1.0, 1.0),
+        (0.0, 1.0),
+    ]
 
     # Verify GET /api/cameras returns masked camera
     get_res = client.get("/api/cameras")
@@ -374,6 +382,7 @@ def test_delete_camera(cam_setup):
     # Confirm removed from manager and vault
     assert engine.camera_manager.get_camera("cam_to_delete") is None
     assert cam_setup["vault"].get("cam_to_delete") is None
+    assert engine.zone_manager.get_zones("cam_to_delete") == []
 
     # Deleting non-existent camera returns 404
     del_missing = client.delete("/api/cameras/cam_to_delete", headers=headers)

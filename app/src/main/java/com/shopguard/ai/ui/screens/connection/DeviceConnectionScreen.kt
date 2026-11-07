@@ -205,7 +205,7 @@ fun DeviceConnectionScreen(
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = { Text("Loopback relay host or emulator alias") },
+                        label = { Text("Tailscale DNS name or emulator host") },
                         placeholder = { Text(if (useHttps) "your-machine.tailscale.net" else "10.0.2.2") },
                         leadingIcon = { Icon(Icons.Filled.Dns, contentDescription = null, tint = PrimaryBlue) },
                         modifier = Modifier.fillMaxWidth(),
@@ -244,8 +244,11 @@ fun DeviceConnectionScreen(
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
-                        label = { Text("Agent Secret API Key (Optional for Health)") },
-                        placeholder = { Text("Token from config/agent_api_key.secret") },
+                        label = { Text("Agent API Key (Optional with Tailscale Serve)") },
+                        placeholder = { Text("Only needed for API-key authentication") },
+                        supportingText = {
+                            Text("The Windows installer authorizes your Tailscale login. Leave this blank when using its private HTTPS address.")
+                        },
                         leadingIcon = { Icon(Icons.Filled.VpnKey, contentDescription = null, tint = PrimaryBlue) },
                         trailingIcon = {
                             IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {

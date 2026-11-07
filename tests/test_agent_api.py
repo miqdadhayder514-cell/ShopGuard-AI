@@ -22,7 +22,7 @@ import numpy as np
 from fastapi.testclient import TestClient
 
 from shopguard.agent.server import create_app
-from shopguard.agent.security_auth import auth_manager
+from shopguard.agent.security_auth import AgentAuthManager, auth_manager
 from shopguard.agent.state_store import PersistentStateStore
 from shopguard.camera.camera_manager import CameraManager
 from shopguard.camera.stream_reader import CameraStatus, StreamReader
@@ -192,6 +192,44 @@ def test_control_endpoints_require_authentication(test_setup):
         json={"reason": "Bad key test"},
     )
     assert bad_arm.status_code == 401
+
+
+def test_control_endpoints_accept_allowlisted_tailscale_identity(test_setup, monkeypatch):
+    """Tailscale Serve identities are authorized only when explicitly allowlisted."""
+    client = test_setup["client"]
+    monkeypatch.setattr(auth_manager, "_tailscale_users", {"shopkeeper@example.com"})
+
+    denied = client.post(
+        "/api/security/arm",
+        headers={"Tailscale-User-Login": "other@example.com"},
+        json={"reason": "Not allowlisted"},
+    )
+    assert denied.status_code == 401
+
+    headers = {"Tailscale-User-Login": "ShopKeeper@Example.com"}
+    arm_res = client.post(
+        "/api/security/arm", headers=headers, json={"reason": "Shopkeeper armed"}
+    )
+    assert arm_res.status_code == 200
+    assert arm_res.json()["state"] == "ARMED"
+
+    disarm_res = client.post(
+        "/api/security/disarm", headers=headers, json={"reason": "Shopkeeper disarmed"}
+    )
+    assert disarm_res.status_code == 200
+    assert disarm_res.json()["state"] == "DISARMED"
+
+
+def test_tailscale_allowlist_reads_utf8_bom(tmp_path):
+    """Windows PowerShell UTF-8 output must not corrupt the first allowed login."""
+    allowlist = tmp_path / "tailscale_allowed_users.txt"
+    allowlist.write_text("\ufeffshopkeeper@example.com\n", encoding="utf-8")
+    manager = AgentAuthManager(
+        secret_path=str(tmp_path / "agent_api_key.secret"),
+        tailscale_users_path=str(allowlist),
+    )
+    assert manager.validate_tailscale_user("ShopKeeper@Example.com")
+    assert not manager.validate_tailscale_user("other@example.com")
 
 
 def test_arm_and_disarm_lifecycle_with_x_api_key(test_setup):

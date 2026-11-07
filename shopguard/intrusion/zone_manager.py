@@ -187,3 +187,7 @@ class ZoneManager:
         if camera_id not in self._zones:
             self._zones[camera_id] = []
         self._zones[camera_id].append(zone)
+
+    def remove_camera(self, camera_id: str) -> None:
+        """Removes all zone configuration associated with a camera."""
+        self._zones.pop(camera_id, None)

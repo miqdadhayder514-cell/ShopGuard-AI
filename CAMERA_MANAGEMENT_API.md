@@ -6,6 +6,10 @@ The agent remains DISARMED after startup. Camera configuration and connection
 probes remain available while disarmed, but registered camera streams start only
 when an authenticated ARM request activates monitoring. Adding an enabled camera
 to an already-armed system starts that camera immediately.
+If a camera has no zone configuration, the agent assigns an enabled full-frame
+restricted zone so Android camera onboarding can proceed without a separate zone
+editor. This includes the entire visible image and may detect people outside the
+shop; cameras with existing zones keep those zones unchanged.
 
 ---
 
@@ -13,7 +17,7 @@ to an already-armed system starts that camera immediately.
 
 - **Default Agent URL**: `http://127.0.0.1:8000`
 - **Android Emulator Loopback**: `http://10.0.2.2:8000`
-- **Authentication**: Strict authentication is enforced on all camera management endpoints. Provide credentials via either:
+- **Authentication**: Strict authentication is enforced on all camera management endpoints. Use an API key or an allowlisted Tailscale Serve identity. The Windows installer creates the Tailscale allowlist; Tailscale ACLs should also restrict access.
   - Header: `X-API-Key: <YOUR_SECRET_KEY>`
   - Header: `Authorization: Bearer <YOUR_SECRET_KEY>`
 - **Content-Type**: `application/json`

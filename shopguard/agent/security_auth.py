@@ -16,6 +16,7 @@ from ..utils.logger import get_logger
 logger = get_logger("agent.auth")
 
 DEFAULT_SECRET_FILE = "config/agent_api_key.secret"
+DEFAULT_TAILSCALE_USERS_FILE = "config/tailscale_allowed_users.txt"
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 BEARER_AUTH = HTTPBearer(auto_error=False)
 
@@ -26,9 +27,37 @@ class AgentAuthManager:
     Ensures secrets are stored outside source code and validated securely.
     """
 
-    def __init__(self, secret_path: str = DEFAULT_SECRET_FILE):
+    def __init__(
+        self,
+        secret_path: str = DEFAULT_SECRET_FILE,
+        tailscale_users_path: str = DEFAULT_TAILSCALE_USERS_FILE,
+    ):
         self.secret_path = os.path.abspath(secret_path)
+        self.tailscale_users_path = os.path.abspath(tailscale_users_path)
         self._api_key = self._resolve_api_key()
+        self._tailscale_users = self._resolve_tailscale_users()
+
+    def _resolve_tailscale_users(self) -> set[str]:
+        """Load the Tailscale identities allowed to control this agent."""
+        try:
+            with open(self.tailscale_users_path, "r", encoding="utf-8-sig") as users_file:
+                users = {
+                    line.strip().casefold()
+                    for line in users_file
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+        except FileNotFoundError:
+            return set()
+        except OSError as exc:
+            logger.error(
+                "Could not read Tailscale control allowlist '%s': %s",
+                self.tailscale_users_path,
+                exc,
+            )
+            return set()
+
+        logger.info("Loaded %d allowed Tailscale control identity(ies).", len(users))
+        return users
 
     def _resolve_api_key(self) -> str:
         """
@@ -79,6 +108,13 @@ class AgentAuthManager:
             return False
         return hmac.compare_digest(provided_key.strip(), self._api_key)
 
+    def validate_tailscale_user(self, user_login: Optional[str]) -> bool:
+        """Check a Serve-injected Tailscale identity against the configured allowlist."""
+        return bool(
+            user_login
+            and user_login.strip().casefold() in self._tailscale_users
+        )
+
 
 # Global singleton auth manager
 auth_manager = AgentAuthManager()
@@ -90,7 +126,7 @@ async def require_control_auth(
     bearer_token: Optional[HTTPAuthorizationCredentials] = Security(BEARER_AUTH),
 ) -> str:
     """
-    FastAPI dependency enforcing strict authentication for control operations (arm/disarm).
+    FastAPI dependency enforcing authentication for control operations (arm/disarm).
     Accepts 'X-API-Key: <key>' or 'Authorization: Bearer <key>'.
     Rejects unauthorized requests with HTTP 401.
     """
@@ -98,20 +134,31 @@ async def require_control_auth(
     if not token and bearer_token:
         token = bearer_token.credentials
 
-    if not token or not auth_manager.validate_key(token):
-        client_ip = request.client.host if request.client else "unknown"
-        logger.warning(
-            f"Unauthorized access attempt rejected on '{request.method} {request.url.path}' from {client_ip}."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "UNAUTHORIZED",
-                "message": "Invalid or missing API authentication credentials. Provide a valid 'X-API-Key' or 'Authorization: Bearer' header.",
-            },
-        )
+    if token and auth_manager.validate_key(token):
+        return token
 
-    return token
+    tailscale_user = request.headers.get("Tailscale-User-Login")
+    if auth_manager.validate_tailscale_user(tailscale_user):
+        return tailscale_user.strip()
+
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning(
+        f"Unauthorized access attempt rejected on '{request.method} {request.url.path}' from {client_ip}."
+    )
+    if token or tailscale_user:
+        message = "Invalid API key or Tailscale identity is not allowed."
+    else:
+        message = (
+            "Provide a valid 'X-API-Key', 'Authorization: Bearer', or allowlisted "
+            "Tailscale Serve identity."
+        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={
+            "error": "UNAUTHORIZED",
+            "message": message,
+        },
+    )
 
 
 async def optional_read_auth(
@@ -134,4 +181,11 @@ async def optional_read_auth(
                 "message": "The provided API authentication key is invalid.",
             },
         )
-    return token
+    if token:
+        return token
+    tailscale_user = request.headers.get("Tailscale-User-Login")
+    return (
+        tailscale_user.strip()
+        if auth_manager.validate_tailscale_user(tailscale_user)
+        else None
+    )

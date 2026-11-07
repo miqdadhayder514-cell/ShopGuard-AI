@@ -43,12 +43,6 @@ fun DashboardScreen(
         ArmConfirmationDialog(
             canArm = uiState.securityStateDetails.canArm,
             rejectionReasons = uiState.securityStateDetails.rejectionReasons,
-            hasApiKey = uiState.deviceConfig.apiKey.isNotBlank(),
-            isDemoMode = uiState.isDemoMode,
-            onConfigureApiKey = {
-                showArmDialog = false
-                onNavigateToConnection()
-            },
             onConfirm = { reason ->
                 showArmDialog = false
                 viewModel.armSecurity(reason)
@@ -59,12 +53,6 @@ fun DashboardScreen(
 
     if (showDisarmDialog) {
         DisarmConfirmationDialog(
-            hasApiKey = uiState.deviceConfig.apiKey.isNotBlank(),
-            isDemoMode = uiState.isDemoMode,
-            onConfigureApiKey = {
-                showDisarmDialog = false
-                onNavigateToConnection()
-            },
             onConfirm = { reason ->
                 showDisarmDialog = false
                 viewModel.disarmSecurity(reason)

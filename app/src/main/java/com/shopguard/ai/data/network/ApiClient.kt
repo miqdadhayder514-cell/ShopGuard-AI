@@ -208,6 +208,7 @@ class ApiClient(
                         403 -> "HTTP 403 Forbidden: Access denied by local agent security policy."
                         404 -> "HTTP 404 Not Found: /api/health endpoint not found. Verify the ShopGuard AI agent is running on this host."
                         422 -> "HTTP 422 Unprocessable Entity: Parameter or payload validation failed."
+                        502 -> "HTTP 502 Bad Gateway: The Tailscale Serve/proxy could not reach the Windows agent. Start the agent on Windows, verify http://127.0.0.1:8000/api/health locally, then configure `tailscale serve 8000` and check `tailscale serve status`."
                         in 500..599 -> "HTTP $code Server Error: The agent encountered an internal server error."
                         else -> "HTTP $code: ${response.message.ifBlank { "Request failed" }}"
                     }

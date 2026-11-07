@@ -114,19 +114,6 @@ class MainViewModel(
 
     fun armSecurity(reason: String = "Shop closed - Manager armed via mobile app") {
         viewModelScope.launch {
-            val config = repository.getDeviceConfig()
-
-            // Validate API key in live mode before sending request
-            if (!repository.isDemoMode && config.apiKey.isBlank()) {
-                _uiState.update {
-                    it.copy(
-                        isArmingDisarming = false,
-                        errorMessage = "Cannot arm: Agent Secret API Key is required. Please configure your API key in Settings → Device Connection."
-                    )
-                }
-                return@launch
-            }
-
             _uiState.update { it.copy(isArmingDisarming = true, errorMessage = null, successMessage = null) }
             val result = repository.armSecurity(reason)
 
@@ -169,19 +156,6 @@ class MainViewModel(
 
     fun disarmSecurity(reason: String = "Morning opening - Disarmed via mobile app") {
         viewModelScope.launch {
-            val config = repository.getDeviceConfig()
-
-            // Validate API key in live mode before sending request
-            if (!repository.isDemoMode && config.apiKey.isBlank()) {
-                _uiState.update {
-                    it.copy(
-                        isArmingDisarming = false,
-                        errorMessage = "Cannot disarm: Agent Secret API Key is required. Please configure your API key in Settings → Device Connection."
-                    )
-                }
-                return@launch
-            }
-
             _uiState.update { it.copy(isArmingDisarming = true, errorMessage = null, successMessage = null) }
             val result = repository.disarmSecurity(reason)
 

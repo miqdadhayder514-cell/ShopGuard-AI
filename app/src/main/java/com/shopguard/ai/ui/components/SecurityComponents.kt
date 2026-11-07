@@ -286,9 +286,6 @@ fun StatCard(
 fun ArmConfirmationDialog(
     canArm: Boolean = true,
     rejectionReasons: List<String> = emptyList(),
-    hasApiKey: Boolean = true,
-    isDemoMode: Boolean = true,
-    onConfigureApiKey: () -> Unit = {},
     onConfirm: (reason: String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -309,34 +306,7 @@ fun ArmConfirmationDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!isDemoMode && !hasApiKey) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = StatusAmberLight,
-                        border = BorderStroke(1.dp, StatusAmber)
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = "⚠️ Agent Secret API Key Missing",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = StatusAmber
-                            )
-                            Text(
-                                text = "Arming the Windows agent strictly requires authentication. Please configure your API key in Device Connection.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextDark
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            TextButton(
-                                onClick = onConfigureApiKey,
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("Configure API Key →", color = PrimaryBlue, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                } else if (!canArm && rejectionReasons.isNotEmpty()) {
+                if (!canArm && rejectionReasons.isNotEmpty()) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
@@ -371,7 +341,6 @@ fun ArmConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm("Armed via mobile application confirmation") },
-                enabled = isDemoMode || hasApiKey,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = StatusGreen,
                     contentColor   = Color.White,
@@ -398,9 +367,6 @@ fun ArmConfirmationDialog(
 
 @Composable
 fun DisarmConfirmationDialog(
-    hasApiKey: Boolean = true,
-    isDemoMode: Boolean = true,
-    onConfigureApiKey: () -> Unit = {},
     onConfirm: (reason: String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -421,35 +387,6 @@ fun DisarmConfirmationDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!isDemoMode && !hasApiKey) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = StatusAmberLight,
-                        border = BorderStroke(1.dp, StatusAmber)
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = "⚠️ Agent Secret API Key Missing",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = StatusAmber
-                            )
-                            Text(
-                                text = "Disarming the Windows agent strictly requires authentication. Please configure your API key in Device Connection.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextDark
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            TextButton(
-                                onClick = onConfigureApiKey,
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("Configure API Key →", color = PrimaryBlue, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
                 Text(
                     text = "Are you sure you want to DISARM the security system?",
                     style = MaterialTheme.typography.bodyMedium,
@@ -465,7 +402,6 @@ fun DisarmConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm("Disarmed via mobile application confirmation") },
-                enabled = isDemoMode || hasApiKey,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = StatusAmber,
                     contentColor   = Color.White,

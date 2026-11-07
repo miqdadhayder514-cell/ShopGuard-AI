@@ -16,6 +16,7 @@ venv.bak/
 *.pem
 *.secret
 config/*.secret
+config/tailscale_allowed_users.txt
 config/cameras_managed.json
 config/firebase_credentials.json
 config/fcm_tokens.json

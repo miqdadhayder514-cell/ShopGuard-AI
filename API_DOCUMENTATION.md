@@ -15,7 +15,9 @@ The Windows agent runs independently of the Android app and always starts DISARM
 Camera capture and person-inference workers start only after an authenticated ARM
 request and stop on DISARM; the API itself stays available.
 
-All administrative or state-altering requests (`POST /api/security/arm`, `POST /api/security/disarm`) require authentication. Read endpoints can optionally enforce authentication depending on the `agent.require_auth_for_read` configuration setting.
+All administrative or state-altering requests (`POST /api/security/arm`, `POST /api/security/disarm`) require authentication. They accept a valid API key or an allowlisted `Tailscale-User-Login` identity added by Tailscale Serve. The allowlist is configured on the Windows host in `config/tailscale_allowed_users.txt`; do not expose the loopback API directly. Read endpoints can optionally enforce the same authentication depending on `agent.require_auth_for_read`.
+
+When requests arrive through Tailscale Serve, it adds a verified `Tailscale-User-Login` header. The agent accepts it only when that exact login is listed in `config/tailscale_allowed_users.txt` (case-insensitive). The one-time Windows installer configures the allowlist. Tailscale ACLs should independently restrict who can reach the ShopGuard machine. The Android client can omit its API key when it connects through this private Serve endpoint.
 
 ### Supported Authentication Headers
 
@@ -34,8 +36,10 @@ You can provide the API key using either of the following standard headers:
 - Set the key via environment variable: `SHOPGUARD_API_KEY=my_secure_api_key_123`
 - Or read the auto-generated 32-byte secret generated on the Windows host at `config/agent_api_key.secret`.
 
-### Android Storage Guidance
-For the future Android application, store this token securely using **Android Jetpack Security** (`EncryptedSharedPreferences`) backed by the hardware **Android Keystore system**.
+### API-key fallback
+The Android client can leave the key blank when connecting through the private
+Tailscale Serve endpoint configured by the Windows installer. Local tools and
+other deployments can continue to use API-key authentication.
 
 ---
 

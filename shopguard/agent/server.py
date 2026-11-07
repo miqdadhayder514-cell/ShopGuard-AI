@@ -50,12 +50,37 @@ from .system_info import collect_system_info, get_agent_uptime_seconds
 from ..camera.camera_vault import camera_vault, normalize_rtsp_components, parse_rtsp_url
 from ..notifications.fcm_notifier import fcm_notifier as default_fcm_notifier, mask_token
 from ..security.security_controller import SecurityState
+from ..intrusion.zone_manager import Zone
 from ..utils.logger import get_logger, mask_url
 from ..utils.helpers import load_config
 
 logger = get_logger("agent.api")
 
 INCIDENT_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+
+def _ensure_default_zone_for_camera(engine: Any, camera_id: str) -> bool:
+    """Assign a full-frame protected zone only when a camera has no zone setup."""
+    zone_manager = getattr(engine, "zone_manager", None)
+    if zone_manager is None or zone_manager.get_all_zones().get(camera_id):
+        return False
+
+    zone_manager.set_zones(
+        camera_id,
+        [
+            Zone(
+                id="zone_full_frame",
+                name="Full Camera View (automatic default)",
+                polygon=[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
+                enabled=True,
+            )
+        ],
+    )
+    logger.info(
+        "Assigned a full-frame default restricted zone to camera '%s'.",
+        camera_id,
+    )
+    return True
 
 
 def create_app(
@@ -136,6 +161,11 @@ def create_app(
                 app.state.engine.camera_manager.load_from_vault(camera_vault, start_now=False)
             except Exception as exc:
                 logger.error(f"Failed to load managed cameras from vault: {exc}")
+
+        camera_manager = getattr(app.state.engine, "camera_manager", None)
+        if camera_manager is not None:
+            for camera_id in camera_manager.get_all_cameras():
+                _ensure_default_zone_for_camera(app.state.engine, camera_id)
 
         if not app.state.state_listener_registered:
             def _on_state_change(old_s: SecurityState, new_s: SecurityState):
@@ -551,6 +581,7 @@ def create_app(
                 start_now=should_start_stream,
                 metadata=metadata,
             )
+            _ensure_default_zone_for_camera(eng, cam_id)
 
         # Ensure rolling pre-event buffer and tracker exist in engine
         if hasattr(eng, "video_buffers") and cam_id not in eng.video_buffers:
@@ -703,6 +734,9 @@ def create_app(
                 metadata=metadata,
             )
 
+        if enabled:
+            _ensure_default_zone_for_camera(eng, camera_id)
+
         iso_now = datetime.now(timezone.utc).isoformat()
         info = CameraInfoModel(
             id=camera_id,
@@ -765,6 +799,9 @@ def create_app(
 
         # Remove from vault storage
         camera_vault.delete(camera_id)
+        zone_manager = getattr(eng, "zone_manager", None)
+        if zone_manager is not None:
+            zone_manager.remove_camera(camera_id)
 
         logger.info(f"Camera '{camera_id}' unmounted and removed via API.")
         return CameraOperationResponse(

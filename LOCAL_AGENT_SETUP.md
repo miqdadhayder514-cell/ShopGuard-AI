@@ -48,15 +48,23 @@ agent:
 
 The API runner and app factory reject non-loopback hosts. Do not expose this agent
 directly to a LAN or the public internet; remote access requires a separately secured
-relay architecture. For a physical Android phone, use Tailscale Serve or another
-authenticated TLS relay that proxies to `127.0.0.1:8000`; the Android emulator can
-use `10.0.2.2:8000` directly.
+relay architecture. For a physical Android phone, the Windows installer configures
+private Tailscale Serve to proxy to `127.0.0.1:8000`; the Android emulator can use
+`10.0.2.2:8000` directly.
 
-### Setting Up the API Key
+### Authentication
 
-Control operations (`/api/security/arm`, `/api/security/disarm`) require an API key. You can specify it in two ways:
+Control requests accept either the API key or an allowlisted Tailscale identity
+forwarded by Tailscale Serve. The one-time Windows installer asks which Tailscale
+login(s) may ARM/DISARM and stores them in the ignored local file
+`config/tailscale_allowed_users.txt`. Tailscale access control should also limit
+access to the ShopGuard device to trusted users. The Android app can leave the API
+key blank when connected through the installed private Tailscale Serve endpoint.
 
-#### Option A: Set via `.env` file (Recommended)
+API-key authentication remains available for local tools and deployments not using
+Tailscale Serve:
+
+#### Option A: Set via `.env` file
 Copy `.env.example` to `.env` and define:
 ```ini
 SHOPGUARD_API_KEY=YourSuperSecretKey123!
@@ -108,14 +116,24 @@ Press `Ctrl+C` in the PowerShell terminal to initiate a graceful shutdown.
 
 ## 5. Running Automatically on Windows Startup
 
-Install a per-user Windows Task Scheduler task from the project root:
+Install a per-user Windows Task Scheduler task from the project root. Before running
+the installer, install Tailscale on Windows, sign in, enable MagicDNS and HTTPS
+certificates for the tailnet, and ensure the Android device is signed in to the same
+tailnet:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\install_windows_task.ps1
 ```
 
-The installer starts the local API immediately and starts it again at each user
-logon. The task runs `tools\run_agent.py`, writes output and errors to
+The installer verifies Tailscale connectivity and the existing Serve configuration,
+asks which Tailscale login(s) may control ShopGuard, installs and starts the local
+agent, waits for its health endpoint, then configures a private HTTPS Serve endpoint
+to `http://127.0.0.1:8000`. It will not overwrite an existing Tailscale Serve
+configuration. Use the displayed `https://<Windows-machine>.ts.net` address in the
+Android Device Connection screen (HTTPS, port 443); the API key field can remain
+blank. Add the shop's camera credentials in the Android camera-management screen.
+
+The task runs `tools\run_agent.py`, writes output and errors to
 `data\logs\agent-startup.log`, and asks Task Scheduler to retry up to five times
 at one-minute intervals if the process exits.
 
@@ -151,8 +169,14 @@ To remove the scheduled task:
 powershell -ExecutionPolicy Bypass -File .\tools\uninstall_windows_task.ps1
 ```
 Uninstalling stops/removes the task but leaves logs, configuration, and incident
-records untouched. To stop the agent without uninstalling it, stop the scheduled
-task in Task Scheduler; it will start again at the next user logon.
+records untouched. Tailscale Serve configuration is also left untouched because it
+may contain other services. After checking `tailscale serve status`, remove the
+ShopGuard Serve configuration only if it is still the sole Serve service:
+```powershell
+tailscale serve --https=443 off
+```
+To stop the agent without uninstalling it, stop the scheduled task in Task
+Scheduler; it will start again at the next user logon.
 
 ---
 
