@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets
+.env
+*.key
+*.pem
+*.secret
+config/*.secret
+config/cameras_managed.json
+config/firebase_credentials.json
+config/fcm_tokens.json
+app/google-services.json
+
+# Data directories
+data/security_state.json
+data/incidents/*
+!data/incidents/.gitkeep
+data/logs/*
+!data/logs/.gitkeep
+data/temporary/*
+!data/temporary/.gitkeep
+
+# Models (weights are downloaded or added locally)
+models/*.pt
+models/*.onnx
+!models/README.md
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & Editor files
+.vscode/
+.idea/
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.swp
+*.swo

@@ -1,0 +1,26 @@
+{
+  "camera_01": [
+    {
+      "id": "zone_entrance",
+      "name": "Main Entrance Protected Area",
+      "polygon": [
+        [0.10, 0.20],
+        [0.50, 0.20],
+        [0.50, 0.90],
+        [0.10, 0.90]
+      ],
+      "enabled": true
+    },
+    {
+      "id": "zone_cash_counter",
+      "name": "Cash Counter Restricted Area",
+      "polygon": [
+        [0.60, 0.35],
+        [0.95, 0.35],
+        [0.95, 0.90],
+        [0.60, 0.90]
+      ],
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+# ShopGuard AI Configuration File
+
+security:
+  initial_state: DISARMED
+  confidence_threshold: 0.45
+  minimum_persistence_seconds: 2
+  event_cooldown_seconds: 30
+
+recording:
+  enabled: true
+  pre_event_seconds: 10
+  post_event_seconds: 15
+  output_directory: data/incidents
+
+ai:
+  model: models/yolo11n.pt
+  device: cpu # Options: cpu, cuda (auto-detects and falls back to cpu if cuda unavailable)
+  processing_fps: 5
+  # Small and distant person detection configuration
+  inference_size: 640            # Supported resolution options: 640, 960, 1280
+  rect_inference: true           # Preserve aspect ratio (rectangular inference)
+  min_box_height_px: 15          # Reject noise below this bounding box pixel height
+  min_box_width_px: 10           # Reject noise below this bounding box pixel width
+  enable_tiled_inference: false  # Optional sliced inference for ultra-high-res CCTV feeds (1080p/4K)
+  tiled_grid: [2, 2]             # Grid slices (rows, cols) when tiled inference is enabled
+  tiled_overlap: 0.20            # Overlap ratio between adjacent tiles (0.10 to 0.40)
+
+cameras:
+  - id: camera_01
+    name: Main Entrance
+    enabled: true
+    source: "ENV:CAMERA_01_URL" # Can be an env variable like ENV:CAMERA_01_URL or a local path like data/test_video.mp4
+    fps: 5
+    reconnect_interval_seconds: 5
+    connection_timeout_seconds: 10
+
+zones:
+  configuration_file: config/zones.example.json
+
+# Phase 2: Local Security Agent (REST API)
+agent:
+  host: "127.0.0.1"             # Bound strictly to localhost; never public internet
+  port: 8000                    # Local HTTP port
+  require_auth_for_read: false  # Arm/disarm ALWAYS requires auth; set true to protect all endpoints
+  state_file: "data/security_state.json"
+  arm_readiness_timeout_seconds: 15
