@@ -181,6 +181,13 @@ class CameraManager:
 
         name = camera_cfg.get("name", cam_id)
         source = camera_cfg.get("source", "")
+        if source is None or not str(source).strip():
+            logger.warning(
+                "Camera '%s' has no configured source; skipping it until a camera "
+                "URL is configured.",
+                cam_id,
+            )
+            return None
         fps = camera_cfg.get("fps", 5.0)
         reconnect_interval = camera_cfg.get("reconnect_interval_seconds", 5.0)
         connection_timeout = camera_cfg.get("connection_timeout_seconds", 10.0)

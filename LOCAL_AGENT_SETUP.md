@@ -133,9 +133,15 @@ configuration. Use the displayed `https://<Windows-machine>.ts.net` address in t
 Android Device Connection screen (HTTPS, port 443); the API key field can remain
 blank. Add the shop's camera credentials in the Android camera-management screen.
 
-The task runs `tools\run_agent.py`, writes output and errors to
-`data\logs\agent-startup.log`, and asks Task Scheduler to retry up to five times
-at one-minute intervals if the process exits.
+The task runs `venv\Scripts\pythonw.exe` directly under Task Scheduler, without a
+console attached to the installation PowerShell window. The installer stops any
+older foreground copy first and verifies that the task's own process is running,
+so its health check cannot pass against a manually launched agent. The task is
+configured not to stop when Windows changes idle state. Application logs are written to
+`data\logs\shopguard.log`; Task Scheduler retries up to five times at one-minute
+intervals if the process exits.
+The task runs while the configured Windows user is signed in; after a computer
+restart, sign in to Windows and make a deliberate ARM request from Android.
 
 ### Startup and monitoring safety
 
@@ -161,7 +167,7 @@ Check task and log status:
 
 ```powershell
 Get-ScheduledTask -TaskName "ShopGuardAI_Engine" | Get-ScheduledTaskInfo
-Get-Content .\data\logs\agent-startup.log -Tail 100
+Get-Content .\data\logs\shopguard.log -Tail 100
 ```
 
 To remove the scheduled task:

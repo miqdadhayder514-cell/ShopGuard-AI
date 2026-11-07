@@ -95,6 +95,19 @@ def test_disabled_camera_is_ignored():
     assert cam_mgr.count_total() == 0
 
 
+def test_camera_with_empty_configured_source_is_ignored():
+    """Unconfigured template cameras must not block app-managed camera readiness."""
+    cam_mgr = CameraManager()
+    reader = cam_mgr.add_camera_from_config({
+        "id": "camera_01",
+        "name": "Main Entrance",
+        "source": "",
+        "enabled": True,
+    })
+    assert reader is None
+    assert cam_mgr.count_total() == 0
+
+
 def test_stream_reader_start_is_idempotent(monkeypatch):
     """Repeated start calls must not create concurrent capture workers."""
     reader = StreamReader(camera_id="cam_idempotent", name="Test", source="unused")

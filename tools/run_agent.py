@@ -7,6 +7,12 @@ import argparse
 import ipaddress
 import os
 import sys
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import uvicorn
 
 # Ensure project root in sys.path
@@ -132,4 +138,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        from shopguard.utils.logger import get_logger
+
+        get_logger("agent.runner").exception(
+            "Unhandled failure while starting or running the agent."
+        )
+        raise

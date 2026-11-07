@@ -15,8 +15,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectDir = (Get-Item -Path $PSScriptRoot).Parent.FullName
-$PythonExe = Join-Path $ProjectDir "venv\Scripts\python.exe"
-$Launcher = Join-Path $ProjectDir "tools\start_agent.ps1"
+$PythonExe = Join-Path $ProjectDir "venv\Scripts\pythonw.exe"
+$PythonConsoleExe = Join-Path $ProjectDir "venv\Scripts\python.exe"
+$Runner = Join-Path $ProjectDir "tools\run_agent.py"
+$RunnerPath = [System.IO.Path]::GetFullPath($Runner)
+$Config = Join-Path $ProjectDir "config\config.yaml"
 $AllowedUsersFile = Join-Path $ProjectDir "config\tailscale_allowed_users.txt"
 $TailscaleCommand = Get-Command "tailscale.exe" -ErrorAction SilentlyContinue
 if (-not $TailscaleCommand) {
@@ -30,11 +33,17 @@ if (-not $TailscaleCommand) {
     $TailscaleExe = $TailscaleCommand.Source
 }
 
-if (-not (Test-Path $PythonExe -PathType Leaf)) {
-    throw "Virtual environment python.exe not found at '$PythonExe'. Create the venv and install requirements first."
+if (-not (Test-Path $PythonExe -PathType Leaf) -or
+    -not (Test-Path $PythonConsoleExe -PathType Leaf)) {
+    throw "Virtual environment Python executables were not found in '$ProjectDir\venv\Scripts'. Create the venv and install requirements first."
 }
-if (-not (Test-Path $Launcher -PathType Leaf)) {
-    throw "Agent launcher not found at '$Launcher'."
+if (-not (Test-Path $Runner -PathType Leaf)) {
+    throw "Agent runner not found at '$Runner'."
+}
+
+& $PythonConsoleExe -c "import cryptography.fernet, firebase_admin" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw "Agent dependencies are missing. Run '.\venv\Scripts\python.exe -m pip install -r requirements.txt', then rerun this installer."
 }
 
 try {
@@ -83,16 +92,16 @@ if (-not [string]::IsNullOrWhiteSpace($ServeStatusText) -and
 New-Item -ItemType Directory -Path (Split-Path $AllowedUsersFile -Parent) -Force | Out-Null
 Set-Content -Path $AllowedUsersFile -Value $AllowedUsers -Encoding UTF8
 
-$PowerShellExe = Join-Path $PSHOME "powershell.exe"
-$Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Launcher`""
+$Arguments = "-u `"$Runner`" --config `"$Config`""
 $Action = New-ScheduledTaskAction `
-    -Execute $PowerShellExe `
+    -Execute $PythonExe `
     -Argument $Arguments `
     -WorkingDirectory $ProjectDir
 $Trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $Settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
+    -DontStopOnIdleEnd `
     -StartWhenAvailable `
     -RestartCount 5 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
@@ -110,13 +119,41 @@ try {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
     }
 
+    # Replace any foreground copy so the health check cannot pass against the
+    # PowerShell-launched process instead of the scheduled task process.
+    $ExistingAgents = @(
+        Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -in @("python.exe", "pythonw.exe") -and
+                $_.CommandLine -and
+                $_.CommandLine.IndexOf($RunnerPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+            }
+    )
+    foreach ($ExistingAgent in $ExistingAgents) {
+        Stop-Process -Id ([int]$ExistingAgent.ProcessId) -Force
+    }
+    $AgentShutdownDeadline = (Get-Date).AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 500
+        $RemainingAgent = Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -in @("python.exe", "pythonw.exe") -and
+                $_.CommandLine -and
+                $_.CommandLine.IndexOf($RunnerPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+            } |
+            Select-Object -First 1
+    } while ($RemainingAgent -and (Get-Date) -lt $AgentShutdownDeadline)
+    if ($RemainingAgent) {
+        throw "Could not stop the existing ShopGuard agent process (PID $($RemainingAgent.ProcessId)); close it and rerun the installer."
+    }
+
     Register-ScheduledTask `
         -TaskName $TaskName `
         -Action $Action `
         -Trigger $Trigger `
         -Settings $Settings `
         -Principal $Principal `
-        -Description "ShopGuard local API and camera processing (always starts DISARMED; logs to data\logs\agent-startup.log)." |
+        -Description "ShopGuard local API and camera processing (starts DISARMED; runs directly under Task Scheduler; logs to data\logs\shopguard.log)." |
         Out-Null
 
     # Start now as well as at future user logons; this starts the API DISARMED.
@@ -124,13 +161,24 @@ try {
     $Deadline = (Get-Date).AddSeconds(60)
     do {
         Start-Sleep -Seconds 2
+        $Health = $null
         try {
             $Health = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/health" -TimeoutSec 3
-            if ($Health) { break }
         } catch {
             if ((Get-Date) -ge $Deadline) {
-                throw "The agent did not become healthy within 60 seconds. Check $ProjectDir\data\logs\agent-startup.log."
+                throw "The agent API did not respond within 60 seconds. Check $ProjectDir\data\logs\shopguard.log."
             }
+        }
+        if ($Health) {
+            $CurrentTask = Get-ScheduledTask -TaskName $TaskName
+            $AgentProcess = Get-CimInstance Win32_Process |
+                Where-Object {
+                    $_.Name -eq "pythonw.exe" -and
+                    $_.CommandLine -and
+                    $_.CommandLine.IndexOf($RunnerPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+                } |
+                Select-Object -First 1
+            if ($CurrentTask.State -eq "Running" -and $AgentProcess) { break }
         }
     } while ((Get-Date) -lt $Deadline)
 
@@ -144,7 +192,8 @@ try {
     Write-Host "[SUCCESS] Task '$TaskName' installed and started." -ForegroundColor Green
     Write-Host "[SUCCESS] Private Tailscale Serve forwards https://$TailnetHost/ to the local agent." -ForegroundColor Green
     Write-Host "Allowed Tailscale identities: $($AllowedUsers -join ', ')" -ForegroundColor Gray
-    Write-Host "The agent starts DISARMED. Runtime output: $ProjectDir\data\logs\agent-startup.log" -ForegroundColor Yellow
+    Write-Host "The agent starts DISARMED under Task Scheduler using pythonw.exe, without a console attached to this PowerShell window." -ForegroundColor Yellow
+    Write-Host "Runtime logs: $ProjectDir\data\logs\shopguard.log" -ForegroundColor Gray
     Write-Host "Automatic recovery: up to five restarts, one minute apart." -ForegroundColor Gray
 } catch {
     Write-Error "Failed to finish ShopGuard setup: $_"
