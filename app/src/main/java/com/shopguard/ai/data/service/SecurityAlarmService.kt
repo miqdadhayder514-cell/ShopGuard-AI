@@ -92,6 +92,9 @@ class SecurityAlarmService : Service() {
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (!AlarmState.isAlarmActive) {
+            AlarmAudioOverride.restoreIfPending(this)
+        }
         createAlarmNotificationChannel()
     }
 
@@ -220,6 +223,7 @@ class SecurityAlarmService : Service() {
 
     private fun startAudio() {
         releaseAudio()
+        AlarmAudioOverride.apply(this)
 
         // Acquire a PARTIAL_WAKE_LOCK so the CPU stays awake and MediaPlayer keeps
         // playing even when the screen is off / phone is locked.
@@ -296,6 +300,7 @@ class SecurityAlarmService : Service() {
             audioManager?.abandonAudioFocus(null)
         }
         audioFocusRequest = null
+        AlarmAudioOverride.restoreIfPending(this)
     }
 
     private fun stopAlarmAndSelf() {

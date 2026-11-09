@@ -105,7 +105,10 @@ app/src/main/java/com/shopguard/ai/
 ### 2.6 Settings Screen (`SettingsScreen.kt`)
 - **Connection Summary Card**: Displays current target agent (`10.0.2.2:8000` or custom IP), authorization status, and quick link to Device Connection settings.
 - **Interactive Demo Mode Switch**: Seamlessly toggles between Live Agent mode and Demo Mode. Instant UI state refresh.
+- **Full-Volume Security Alarm**: Settings provides a link to Android's Do Not Disturb access screen and shows whether ShopGuard has that access. For an active incident only, the alarm stream is temporarily raised to maximum and, when authorized, Do Not Disturb is temporarily disabled; the saved settings are restored when the alarm stops.
 - **Architecture & System Information**: Displays mobile client version, agent API compatibility, and security notices regarding local network isolation.
+
+Android requires the shopkeeper to grant Do Not Disturb access in **Settings → App Settings → Full-Volume Security Alarm → Enable Full-Volume Alarm**. The app persists the original alarm volume and interruption filter for recovery if the alarm service restarts. Android/OEM policies, hardware mute controls, connected audio devices, a powered-off phone, or a force-stopped app can still prevent audible alert delivery; this is a best-effort alarm feature, not a guarantee that every phone sound restriction can be bypassed.
 
 ### 2.7 Device Connection Screen (`DeviceConnectionScreen.kt`)
 - **Agent Endpoint Inputs**:

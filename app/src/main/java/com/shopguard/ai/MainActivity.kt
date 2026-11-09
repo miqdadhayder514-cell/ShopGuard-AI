@@ -21,6 +21,7 @@ import com.shopguard.ai.data.alarm.AlarmState
 import com.shopguard.ai.data.local.PreferencesManager
 import com.shopguard.ai.data.notification.NotificationHelper
 import com.shopguard.ai.data.repository.ShopGuardRepository
+import com.shopguard.ai.data.service.AlarmAudioOverride
 import com.shopguard.ai.data.service.SecurityAlarmService
 import com.shopguard.ai.ui.components.NotificationPermissionDialog
 import com.shopguard.ai.ui.navigation.ShopGuardNavGraph
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!AlarmState.isAlarmActive) {
+            AlarmAudioOverride.restoreIfPending(applicationContext)
+        }
 
         // 1. Initialize high-importance security notification channel
         NotificationHelper.createNotificationChannel(applicationContext)
@@ -106,6 +110,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (!AlarmState.isAlarmActive) {
+            AlarmAudioOverride.restoreIfPending(applicationContext)
+        }
         // Sync alarm state so UI reflects alarms that started while the app was backgrounded
         viewModel.syncAlarmState()
     }

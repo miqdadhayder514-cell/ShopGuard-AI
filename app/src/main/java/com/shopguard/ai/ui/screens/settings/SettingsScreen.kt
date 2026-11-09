@@ -1,5 +1,9 @@
 package com.shopguard.ai.ui.screens.settings
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +25,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shopguard.ai.BuildConfig
+import com.shopguard.ai.data.service.AlarmAudioOverride
 import com.shopguard.ai.data.service.SecurityAlarmService
 import com.shopguard.ai.ui.components.*
 import com.shopguard.ai.ui.theme.*
@@ -37,6 +42,15 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     var tokenCopied by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var hasDoNotDisturbAccess by remember {
+        mutableStateOf(AlarmAudioOverride.hasDoNotDisturbAccess(context))
+    }
+    val dndSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        hasDoNotDisturbAccess = AlarmAudioOverride.hasDoNotDisturbAccess(context)
+    }
 
     // Fetch FCM token from Firebase on first composition
     LaunchedEffect(Unit) {
@@ -223,6 +237,62 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             }
+                        }
+                    }
+
+                    HorizontalDivider(color = BorderLight)
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.NotificationsActive,
+                                contentDescription = null,
+                                tint = if (hasDoNotDisturbAccess) StatusGreen else StatusRed
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Full-Volume Security Alarm",
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = TextDark
+                                )
+                                Text(
+                                    text = if (hasDoNotDisturbAccess) {
+                                        "Enabled: ShopGuard temporarily raises alarm volume and bypasses Do Not Disturb during alerts, then restores previous settings."
+                                    } else {
+                                        "ShopGuard raises alarm volume during alerts. Grant access to also bypass Do Not Disturb and silent mode."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (hasDoNotDisturbAccess) TextMid else StatusRed
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                dndSettingsLauncher.launch(
+                                    Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (hasDoNotDisturbAccess) StatusGreen else PrimaryBlue
+                            )
+                        ) {
+                            Text(
+                                if (hasDoNotDisturbAccess) {
+                                    "Manage Do Not Disturb Access"
+                                } else {
+                                    "Enable Full-Volume Alarm"
+                                }
+                            )
                         }
                     }
 
